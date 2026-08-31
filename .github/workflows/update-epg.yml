@@ -4,9 +4,7 @@ on:
   schedule:
     # Оновлення щодня о 02:00 за Києвом
     - cron: '0 2 * * *'
-      timezone: "Europe/Kyiv"
-
-  # Можна запустити вручну
+    # Можна запустити вручну
   workflow_dispatch:
 
 permissions:
