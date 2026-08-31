@@ -2,7 +2,11 @@ name: Update EPG
 
 on:
   schedule:
-    - cron: '17 */6 * * *'
+    # Оновлення щодня о 02:00 за Києвом
+    - cron: '0 2 * * *'
+      timezone: "Europe/Kyiv"
+
+  # Можна запустити вручну
   workflow_dispatch:
 
 permissions:
