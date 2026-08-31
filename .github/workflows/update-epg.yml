@@ -23,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          URL="http://epg.one/epg.xml.gz"
+          URL="http://epg.one/epg2.xml.gz"
           TEMP="epg.xml.gz.tmp"
 
           echo "Downloading EPG from $URL"
