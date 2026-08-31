@@ -15,45 +15,86 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Download EPG
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           URL="http://epg.one/epg.xml.gz"
           TEMP="epg.xml.gz.tmp"
+          OUTPUT="epg.xml.gz"
 
-          echo "Downloading EPG from $URL..."
+          echo "======================================"
+          echo "Downloading EPG"
+          echo "URL: $URL"
+          echo "======================================"
 
-          curl -L --fail --retry 3 --connect-timeout 30 \
-            -o "$TEMP" "$URL"
+          rm -f "$TEMP"
 
-          echo "Downloaded file size:"
+          curl \
+            --location \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --retry-delay 5 \
+            --connect-timeout 30 \
+            --max-time 300 \
+            --output "$TEMP" \
+            "$URL"
+
+          echo
+          echo "Downloaded file:"
           ls -lh "$TEMP"
 
-          # Перевіряємо, що це справді gzip
-          if ! gzip -t "$TEMP"; then
-            echo "ERROR: Downloaded file is not a valid gzip archive!"
-            exit 1
-          fi
-
-          # Перевіряємо, що файл не порожній
+          # Перевірка на порожній файл
           if [ ! -s "$TEMP" ]; then
-            echo "ERROR: Downloaded file is empty!"
+            echo "ERROR: Downloaded EPG file is empty!"
+            rm -f "$TEMP"
             exit 1
           fi
 
-          mv "$TEMP" epg.xml.gz
+          # Перевірка gzip
+          echo "Checking gzip archive..."
 
-          echo "EPG successfully updated."
+          if ! gzip -t "$TEMP"; then
+            echo "ERROR: Downloaded file is NOT a valid gzip archive!"
+            rm -f "$TEMP"
+            exit 1
+          fi
+
+          echo "GZIP check: OK"
+
+          # Перевірка, що всередині XMLTV
+          echo "Checking XMLTV content..."
+
+          if ! gzip -cd "$TEMP" | head -c 1000 | grep -q "<tv"; then
+            echo "ERROR: Downloaded archive does not appear to contain XMLTV data!"
+            rm -f "$TEMP"
+            exit 1
+          fi
+
+          echo "XMLTV check: OK"
+
+          # Атомарна заміна старого файлу
+          mv "$TEMP" "$OUTPUT"
+
+          echo
+          echo "EPG successfully downloaded."
 
       - name: Check for changes
         id: changes
+        shell: bash
         run: |
+          set -euo pipefail
+
           if git diff --quiet -- epg.xml.gz; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "EPG has not changed."
+            echo "EPG has NOT changed."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "EPG has changed."
@@ -61,10 +102,22 @@ jobs:
 
       - name: Commit and push
         if: steps.changes.outputs.changed == 'true'
+        shell: bash
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add epg.xml.gz
+
           git commit -m "Update EPG"
+
           git push
+
+          echo "EPG successfully committed and pushed."
+
+      - name: Nothing to update
+        if: steps.changes.outputs.changed == 'false'
+        run: |
+          echo "EPG is already up to date."
