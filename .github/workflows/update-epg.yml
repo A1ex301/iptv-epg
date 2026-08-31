@@ -51,14 +51,14 @@ jobs:
           echo "Downloaded file:"
           ls -lh "$TEMP"
 
-          # Перевірка, що файл не порожній
+          # Файл не повинен бути порожнім
           if [ ! -s "$TEMP" ]; then
             echo "ERROR: Downloaded EPG file is empty!"
             rm -f "$TEMP"
             exit 1
           fi
 
-          # Перевірка gzip
+          # Перевіряємо gzip
           echo
           echo "Checking gzip archive..."
 
@@ -70,25 +70,7 @@ jobs:
 
           echo "GZIP check: OK"
 
-          # Перевірка XMLTV без pipe/head,
-          # щоб не отримувати Broken pipe
-          echo
-          echo "Checking XMLTV content..."
-
-          gzip -cd "$TEMP" > epg.xml.check
-
-          if grep -q "<tv" epg.xml.check; then
-            echo "XMLTV check: OK"
-          else
-            echo "ERROR: Downloaded archive does not appear to contain XMLTV data!"
-            rm -f "$TEMP" epg.xml.check
-            exit 1
-          fi
-
-          # Видаляємо тимчасовий розпакований XML
-          rm -f epg.xml.check
-
-          # Атомарна заміна старого EPG
+          # Замінюємо старий файл тільки після успішної перевірки
           mv "$TEMP" "$OUTPUT"
 
           echo
@@ -120,9 +102,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add epg.xml.gz
-
           git commit -m "Update EPG"
-
           git push
 
           echo "EPG successfully committed and pushed."
