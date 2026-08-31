@@ -2,7 +2,6 @@ name: Update EPG
 
 on:
   schedule:
-    # Оновлення кожні 6 годин
     - cron: '17 */6 * * *'
   workflow_dispatch:
 
@@ -26,12 +25,8 @@ jobs:
 
           URL="http://epg.one/epg.xml.gz"
           TEMP="epg.xml.gz.tmp"
-          OUTPUT="epg.xml.gz"
 
-          echo "======================================"
-          echo "Downloading EPG"
-          echo "URL: $URL"
-          echo "======================================"
+          echo "Downloading EPG from $URL"
 
           rm -f "$TEMP"
 
@@ -47,53 +42,28 @@ jobs:
             --output "$TEMP" \
             "$URL"
 
-          echo
           echo "Downloaded file:"
           ls -lh "$TEMP"
 
-          # Файл не повинен бути порожнім
           if [ ! -s "$TEMP" ]; then
-            echo "ERROR: Downloaded EPG file is empty!"
-            rm -f "$TEMP"
+            echo "ERROR: EPG file is empty!"
             exit 1
           fi
 
-          # Перевіряємо gzip
-          echo
-          echo "Checking gzip archive..."
+          echo "Checking gzip..."
 
           if ! gzip -t "$TEMP"; then
-            echo "ERROR: Downloaded file is NOT a valid gzip archive!"
-            rm -f "$TEMP"
+            echo "ERROR: Invalid gzip archive!"
             exit 1
           fi
 
           echo "GZIP check: OK"
 
-          # Замінюємо старий файл тільки після успішної перевірки
-          mv "$TEMP" "$OUTPUT"
+          mv "$TEMP" epg.xml.gz
 
-          echo
-          echo "======================================"
-          echo "EPG successfully updated."
-          echo "======================================"
+          echo "EPG successfully downloaded."
 
-      - name: Check for changes
-        id: changes
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if git diff --quiet -- epg.xml.gz; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "EPG has NOT changed."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "EPG has changed."
-          fi
-
-      - name: Commit and push
-        if: steps.changes.outputs.changed == 'true'
+      - name: Commit and push EPG
         shell: bash
         run: |
           set -euo pipefail
@@ -102,12 +72,13 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add epg.xml.gz
+
+          if git diff --cached --quiet; then
+            echo "EPG has not changed."
+            exit 0
+          fi
+
           git commit -m "Update EPG"
           git push
 
           echo "EPG successfully committed and pushed."
-
-      - name: Nothing to update
-        if: steps.changes.outputs.changed == 'false'
-        run: |
-          echo "EPG is already up to date."
